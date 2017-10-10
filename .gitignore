@@ -1,8 +1,8 @@
-reagan/*
+video_prep/reagan/*
 fis/*
-test/*
-dlib_models/*
-frontalization_models/*
+video_prep/test/*
+video_prep/dlib_models/*
+video_prep/frontalization_models/*
 faces/*
 out/*
 is/*
