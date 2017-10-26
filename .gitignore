@@ -3,6 +3,9 @@ fis/*
 video_prep/test/*
 video_prep/dlib_models/*
 video_prep/frontalization_models/*
+audio_prep/out/*
+audio_prep/test/*
+audio_prep/mfccs/*
 faces/*
 out/*
 is/*
