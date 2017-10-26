@@ -6,14 +6,11 @@ import json
 class Seq2Shape():
 
     def __init__(
-        self, batch_size, time_major=False,
-        average_across_batch=True, average_across_timesteps=True
+        self, batch_size, dim_out, time_major=False,
     ):
-        self.average_across_batch = average_across_batch
-        self.average_across_timesteps = average_across_timesteps
         self.time_major = time_major
         self.batch_size = batch_size
-        self.mode = mode
+        self.dim_out = dim_out
 
 
     def _get_lstm(self, num_units):
@@ -37,7 +34,7 @@ class Seq2Shape():
         inputs, cell=None,
     ):
         with tf.name_scope('Translate'):
-            if cell
+            if cell:
                 network_cell = cell
             else:
                 network_cell = tf.nn.rnn_cell.BasicLSTMCell(2*num_units)
@@ -55,30 +52,27 @@ class Seq2Shape():
                 return outputs.rnn_output, outputs.sample_id
 
     def prepare_train_eval(
-        self, t_out,
+        self, t_out, num_units,
         out_seq_len, labels, lr,
-        train_op=None, loss=None
     ):
-        if not loss:
-            weights = tf.sequence_mask(
-                out_seq_len,
-                dtype=t_out.dtype
-            )
-            loss = tf.contrib.seq2seq.sequence_loss(
-                t_out,
-                labels,
-                weights,
-                average_across_batch=self.average_across_batch,
-            )
+        with tf.variable_scope('Weights_Intersect'):
+          output_w = tf.get_variable("output_w", [num_units, self.dimout])
+          output_b = tf.get_variable("output_b", [self.dimout])
+        t_out = tf.reshape(tf.concat(1, t_out), [-1, num_units])
+        t_out = tf.nn.xw_plus_b(t_out, output_w, output_b)
+        loss = tf.squared_difference(
+            t_out,
+            labels,
+        )
+        loss = loss / (self.batch_size*out_seq_len*self.dim_out)
 
-        if not train_op:
-            train_op = tf.contrib.layers.optimize_loss(
-                loss,
-                tf.train.get_global_step(),
-                optimizer='SGD',
-                learning_rate=lr,
-                summaries=['loss', 'learning_rate']
-            )
+        train_op = tf.contrib.layers.optimize_loss(
+            loss,
+            tf.train.get_global_step(),
+            optimizer='SGD',
+            learning_rate=lr,
+            summaries=['loss', 'learning_rate']
+        )
 
         return tf.estimator.EstimatorSpec(
             mode=self.mode,
