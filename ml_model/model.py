@@ -6,21 +6,22 @@ import json
 class Seq2Shape():
 
     def __init__(
-        self, batch_size, dim_out, time_major=False,
+        self, batch_size, dim_out, mode, time_major=False,
     ):
         self.time_major = time_major
         self.batch_size = batch_size
         self.dim_out = dim_out
+        self.mode = mode
 
 
     def _get_lstm(self, num_units):
         return tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
-    def _decoder(self, network_cell, out_seq_len, inputs, helper):
+    def _decoder(self, network_cell, inputs, helper):
         if not helper:
             helper = tf.contrib.seq2seq.TrainingHelper(
                 inputs,
-                out_seq_len,
+                self.dim_out
             )
         initial_state = self.decoder_cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
         decoder = tf.contrib.seq2seq.BasicDecoder(
@@ -30,7 +31,7 @@ class Seq2Shape():
         return decoder
 
     def translate(
-        self, num_units, out_seq_len,
+        self, num_units,
         inputs, cell=None,
     ):
         with tf.name_scope('Translate'):
@@ -39,10 +40,10 @@ class Seq2Shape():
             else:
                 network_cell = tf.nn.rnn_cell.BasicLSTMCell(2*num_units)
 
-            decoder = self._decoder(network_cell, out_seq_len, inputs)
+            decoder = self._decoder(network_cell, inputs)
             outputs = tf.contrib.seq2seq.dynamic_decode(
                 decoder,
-                maximum_iterations=20,
+                maximum_iterations=24,
                 swap_memory=True,
             )
             outputs = outputs[0]
@@ -79,3 +80,9 @@ class Seq2Shape():
             loss=loss,
             train_op=train_op,
         )
+    def prepare_predict(self, sample_id):
+        return tf.estimator.EstimatorSpec(
+            mode=self.mode,
+            train_op=train_op,
+        )
+
