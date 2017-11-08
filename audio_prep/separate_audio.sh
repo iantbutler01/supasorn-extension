@@ -3,7 +3,7 @@
 shopt -s "dotglob"
 shopt -s "nullglob"
 mkdir $1
-for i in ./test/*
+for i in /media/pibrain/extern/reagan/*
 do
   mkdir $1/$(basename ${i%%})
   ffmpeg -i "./${i}" -f wav -ab 192000 -ar 16000 -vn $1/$(basename ${i%%})/output.wav

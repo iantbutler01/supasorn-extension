@@ -20,12 +20,16 @@ def extract_mouth_landmarks(f):
     mouth = []
     mouth.extend(face_landmarks['top_lip'])
     mouth.extend(face_landmarks['bottom_lip'])
-    return np.array(list(sum(mouth, ()))).reshape(1,-1)
+    return np.array(sum(mouth, ()))
 
 def perform_pca(lm_vecs):
     pca = PCA()
-    pca.fit(lm_vecs)
-    print(pca.singular_values_)
+    mean = np.mean(lm_vecs)
+    norm_lm_vec = (lm_vecs - mean) / np.std(lm_vecs)
+    pca.fit(norm_lm_vec)
+    coef = pca.components_
+    print(coef)
+    return coef
 
 def main():
     lock = Lock()
@@ -35,11 +39,10 @@ def main():
     global file_dir
     file_dir = argv[1]
     files = glob.glob(f'{file_dir}/out/**/*.jpg', recursive=True)
-    print(files)
-    with Pool(initializer=init_child, initargs=(lock,)) as p:
-        vals = p.map(extract_mouth_landmarks, files)
-        print(vals[0])
-        perform_pca(vals[0])
+    with Pool(initializer=init_child, initargs=(lock,)) as po:
+        vals = po.map(extract_mouth_landmarks, files)
+    vals = np.array(vals)
+    pca = perform_pca(vals)
 
 
 if __name__ == '__main__':

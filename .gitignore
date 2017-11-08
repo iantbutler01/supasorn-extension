@@ -9,4 +9,6 @@ audio_prep/mfccs/*
 faces/*
 out/*
 is/*
+video_prep/frontalized_faces/*
 reagan
+face_frontalization/*
