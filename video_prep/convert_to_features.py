@@ -23,13 +23,10 @@ def extract_mouth_landmarks(f):
     return np.array(sum(mouth, ()))
 
 def perform_pca(lm_vecs):
-    pca = PCA()
+    pca = PCA(n_components=20)
     mean = np.mean(lm_vecs)
     norm_lm_vec = (lm_vecs - mean) / np.std(lm_vecs)
-    pca.fit(norm_lm_vec)
-    coef = pca.components_
-    print(coef)
-    return coef
+    return pca.fit_transform(norm_lm_vec)
 
 def main():
     lock = Lock()
@@ -43,7 +40,7 @@ def main():
         vals = po.map(extract_mouth_landmarks, files)
     vals = np.array(vals)
     pca = perform_pca(vals)
-
+    np.save('processed_mouth_shapes', pca)
 
 if __name__ == '__main__':
     main()
