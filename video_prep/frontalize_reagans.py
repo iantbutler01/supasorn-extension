@@ -17,7 +17,7 @@ def forwardify(image_path, model3D, num, folder_name):
     proj_matrix, camera_matrix, rmat, tvec = camera_calibration.estimate_camera(model3D, landmarks[0])
     eyemask = np.asarray(io.loadmat(MODEL_PATH+'eyemask.mat')['eyemask'])
     _, frontal_sym = frontalize.frontalize(img, proj_matrix, model3D.ref_U, eyemask)
-    cv.imwrite(f'./frontalized_faces/{folder_name}/{num}.jpg', frontal_sym)
+    cv.imwrite(f'/media/pibrain/extern/frontalized_faces/{folder_name}/{num}.jpg', frontal_sym)
 
 def handle_frames(frame_path):
     folder_name = frame_path.split('/')[-2]
@@ -33,13 +33,13 @@ def main():
         exit(-1)
     file_dir = argv[-1]
     if not path.exists(f'./frontalized_faces'):
-        mkdir(f'./frontalized_faces')
+        mkdir(f'/media/pibrain/extern/frontalized_faces')
     check_resources.check_dlib_landmark_weights()
 
     for sub_folder_path in glob(argv[1]+"/*"):
         folder_name = sub_folder_path.split('/')[-1]
         if not path.exists(f'./frontalized_faces/{folder_name}'):
-            mkdir(f'./frontalized_faces/{folder_name}')
+            mkdir(f'/media/pibrain/extern/frontalized_faces/{folder_name}')
         with Pool() as p:
             p.map(handle_frames, glob(sub_folder_path+"/*"))
 

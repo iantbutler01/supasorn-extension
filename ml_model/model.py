@@ -17,16 +17,20 @@ class Seq2Shape():
     def _get_lstm(self, num_units):
         return tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
-    def _decoder(self, network_cell, inputs, helper):
+    def _decoder(self, network_cell, inputs, helper=None):
         if not helper:
+            input_lengths = tf.reduce_sum(tf.to_int32(tf.not_equal(inputs, 1)), 1)
+            print(input_lengths)
             helper = tf.contrib.seq2seq.TrainingHelper(
                 inputs,
-                self.dim_out
+                input_lengths
             )
-        initial_state = self.decoder_cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+        print(inputs)
+        initial_state = network_cell.zero_state(batch_size=self.batch_size+8, dtype=tf.float32)
         decoder = tf.contrib.seq2seq.BasicDecoder(
             network_cell,
             helper,
+            initial_state=initial_state
         )
         return decoder
 
@@ -38,11 +42,12 @@ class Seq2Shape():
             if cell:
                 network_cell = cell
             else:
-                network_cell = tf.nn.rnn_cell.BasicLSTMCell(2*num_units)
+                network_cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
             decoder = self._decoder(network_cell, inputs)
             outputs = tf.contrib.seq2seq.dynamic_decode(
                 decoder,
+                impute_finished=True,
                 maximum_iterations=24,
                 swap_memory=True,
             )

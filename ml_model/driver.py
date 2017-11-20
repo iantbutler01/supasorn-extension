@@ -17,7 +17,7 @@ with open('./hyperparameters.json', 'r') as f:
 def model_fn(features, labels, mode, params, config):
 
     model = Seq2Shape(params.batch_size, 28, mode)
-
+    print(features)
     if mode == estimator.ModeKeys.TRAIN or mode == estimator.ModeKeys.EVAL:
         _, sample_id = model.translate(params.num_units, features)
         spec = model.prepare_train_eval(t_out, params.num_units, labels, params.learning_rate)
@@ -27,10 +27,9 @@ def model_fn(features, labels, mode, params, config):
     return spec
 
 def experiment_fn(run_config, hparams):
-    input_fn_factory = ModelInputs(hparams.vocab_paths, hparams.batch_size)
-    train_input_fn, train_input_hook = input_fn_factory.get_inputs(hparams.train_dataset_paths)
-    eval_input_fn, eval_input_hook = input_fn_factory.get_inputs(hparams.eval_dataset_paths, mode=estimator.ModeKeys.EVAL)
-
+    input_fn_factory = ModelInputs(hparams.batch_size, hparams.train_dataset_path)
+    train_input_fn, train_input_hook = input_fn_factory.get_inputs()
+    eval_input_fn, eval_input_hook = input_fn_factory.get_inputs(mode=estimator.ModeKeys.EVAL)
     exp_estimator = get_estimator(run_config, hparams)
     run_config.replace(save_checkpoints_steps=hparams.min_eval_frequency)
 

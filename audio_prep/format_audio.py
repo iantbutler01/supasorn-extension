@@ -5,11 +5,9 @@ import scipy.io.wavfile
 from scipy.fftpack import dct
 from sys import argv, exit
 from glob import glob
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-from matplotlib import cm
 from os import mkdir, path
+from multiprocessing import Pool
+import re
 
 NFFT=512
 
@@ -17,9 +15,9 @@ def get_mfccs(mel_filter_banks):
     num_ceps = 13
     mfccs = dct(mel_filter_banks, norm='ortho', axis=1)[:, 1:num_ceps+1]
     nframes, ncoeffs = mfccs.shape
-    n = np.arrange(ncoeffs)
+    n = np.arange(ncoeffs)
     cepp_lifter = 22
-    lift = 1+(cep_lifter/2)*np.sin(np.pi * n / cep_lifter)
+    lift = 1+(cepp_lifter/2)*np.sin(np.pi * n / cepp_lifter)
     mfccs *= lift
     return mfccs
 
@@ -66,13 +64,23 @@ def signal_to_frames(signal, step_size, sample_rate, ms=0.025, st=0.01):
     return frames
 
 def process(file_path):
+    if not re.search(r'normalized', file_path):
+        return
+    folder = file_path.split('/')[-2]
     sample_rate, signal = scipy.io.wavfile.read(file_path)
+    print(sample_rate)
     step = int(math.floor(0.025*sample_rate))
     frames = signal_to_frames(signal, step, sample_rate)
     power_spectra = get_spectra(frames)
+    energy = np.where(power_spectra == 0, np.finfo(float).eps, power_spectra)
+    energy = np.log(energy)[:, 1:16]
     applied_mel_scale = apply_mel_scale_filter(power_spectra, sample_rate)
-    file_name = file_path.split('/')[-1]
-    np.savetxt(f'./mfccs/{file_name}', applied_mel_scale)
+    mfccs = get_mfccs(applied_mel_scale)
+    output = np.concatenate([mfccs, energy], 1)
+    file_name = file_path.split('/')[-1].split('.')[0]
+    if not path.exists(f'./mfccs/{folder}'):
+        mkdir(f'./mfccs/{folder}')
+    np.savetxt(f'./mfccs/{folder}/{file_name}', output)
 
 def main():
     if len(argv) < 2:
@@ -81,9 +89,9 @@ def main():
 
     if not path.exists(f'./mfccs'):
         mkdir('./mfccs')
-    for sub_folder_path in glob(argv[1]+"/*"):
-        for audio_path in glob(sub_folder_path+"/*"):
-            process(audio_path)
+    audio_paths = glob(argv[1]+"/**/*")
+    with Pool() as po:
+        po.map(process, audio_paths)
 
 
 if __name__ == '__main__':
