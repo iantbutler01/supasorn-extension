@@ -20,13 +20,11 @@ class Seq2Shape():
     def _decoder(self, network_cell, inputs, helper=None):
         if not helper:
             input_lengths = tf.reduce_sum(tf.to_int32(tf.not_equal(inputs, 1)), 1)
-            print(input_lengths)
             helper = tf.contrib.seq2seq.TrainingHelper(
                 inputs,
-                input_lengths
+                [100]*self.batch_size
             )
-        print(inputs)
-        initial_state = network_cell.zero_state(batch_size=self.batch_size+8, dtype=tf.float32)
+        initial_state = network_cell.zero_state(batch_size=self.batch_size, dtype=tf.float64)
         decoder = tf.contrib.seq2seq.BasicDecoder(
             network_cell,
             helper,
@@ -48,8 +46,7 @@ class Seq2Shape():
             outputs = tf.contrib.seq2seq.dynamic_decode(
                 decoder,
                 impute_finished=True,
-                maximum_iterations=24,
-                swap_memory=True,
+                maximum_iterations=100,
             )
             outputs = outputs[0]
             if self.mode != estimator.ModeKeys.PREDICT:
@@ -62,14 +59,15 @@ class Seq2Shape():
         out_seq_len, labels, lr,
     ):
         with tf.variable_scope('Weights_Intersect'):
-          output_w = tf.get_variable("output_w", [num_units, self.dimout])
-          output_b = tf.get_variable("output_b", [self.dimout])
-        t_out = tf.reshape(tf.concat(1, t_out), [-1, num_units])
+          output_w = tf.get_variable("output_w", [num_units, self.dim_out], dtype=tf.float64)
+          output_b = tf.get_variable("output_b", [self.dim_out], dtype=tf.float64)
+        t_out = tf.reshape(tf.concat(t_out, 1), [-1, num_units])
         t_out = tf.nn.xw_plus_b(t_out, output_w, output_b)
-        loss = tf.squared_difference(
+        labels = tf.reshape(labels,[-1, self.dim_out])
+        loss = tf.reduce_sum(tf.squared_difference(
             t_out,
             labels,
-        )
+        ))
         loss = loss / (self.batch_size*out_seq_len*self.dim_out)
 
         train_op = tf.contrib.layers.optimize_loss(

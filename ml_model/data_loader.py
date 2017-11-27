@@ -4,6 +4,7 @@ import os
 import numpy as np
 import struct
 import bisect
+import _pickle as cPickle
 
 def readSingleInt(path):
   with open(path) as f:
@@ -25,15 +26,21 @@ def _str_to_bool(s):
 
 class DataLoader():
 
-  def __init__(self, training_dir):
+  def __init__(self, training_dir, save_dir, seq_length=100, time_delay=0):
     self.training_dir = training_dir
     self.fps = 29
+    self.save_dir = save_dir
+    self.reprocess = False
+    self.usetrainingof = ''
+    self.normalizeinput = True
+    self.normalizeoutput = True
+    self.seq_length = seq_length
+    self.timedelay = time_delay
 
   def createInputFeature(self, audio, audiodiff, timestamps, startframe, nframe):
     startAudio = bisect.bisect_left(timestamps, (startframe - 1) // self.fps)
     endAudio = bisect.bisect_right(timestamps, (startframe + nframe - 2) // self.fps)
     audio_debug = (audio[startAudio:endAudio, :-1], audiodiff[startAudio:endAudio, :])
-    print(audio_debug[0].shape, audio_debug[1].shape)
     inp = np.concatenate((audio[startAudio:endAudio, :-1], audiodiff[startAudio:endAudio, :]), axis=1)
     return startAudio, endAudio, inp 
 
@@ -43,10 +50,10 @@ class DataLoader():
     newoutps = {"training": [], "validation": []}
     for key in newinps:
       for i in range(len(inps[key])):
-        if len(inps[key][i]) - self.args.timedelay >= (self.args.seq_length+2):
-          if self.args.timedelay > 0:
-            newinps[key].append(inps[key][i][self.args.timedelay:])
-            newoutps[key].append(outps[key][i][:-self.args.timedelay])
+        if len(inps[key][i]) - self.timedelay >= (self.seq_length+2):
+          if self.timedelay > 0:
+            newinps[key].append(inps[key][i][self.timedelay:])
+            newoutps[key].append(outps[key][i][:-self.timedelay])
           else:
             newinps[key].append(inps[key][i])
             newoutps[key].append(outps[key][i])
@@ -84,7 +91,7 @@ class DataLoader():
 
             startAudio, endAudio, inp = self.createInputFeature(audio, audiodiff, timestamps, startframe, nframe)
 
-            outp = np.zeros((endAudio - startAudio, fids.shape[1]), dtype=np.float32)
+            outp = np.zeros((endAudio - startAudio, fids.shape[1]), dtype=np.float64)
             leftmark = 0
             for aud in range(startAudio, endAudio):
               audiotime = audio[aud, -1]
@@ -100,9 +107,37 @@ class DataLoader():
 
     return (inps, outps)
 
+  def normalizeData(self, lst, savedir, name, varnames, normalize=True):
+    allstrokes = np.concatenate(lst)
+    mean = np.mean(allstrokes, 0)
+    std = np.std(allstrokes, 0) 
+
+    f = open(savedir + "/" + name + ".txt", "w")
+    minv = np.min(allstrokes, 0)
+    maxv = np.max(allstrokes, 0)
+
+    if not isinstance(normalize, list):
+     normalize = [normalize] * len(mean)
+
+    for i, n in enumerate(varnames):
+        if normalize[i]:
+          f.write(n + "\n  mean: %f\n  std :%f\n  min :%f\n  max :%f\n\n" % (mean[i], std[i], minv[i], maxv[i]))
+        else:
+          f.write(n + "\n  mean: %f (-> 0)\n  std :%f (-> 1)\n  min :%f\n  max :%f\n\n" % (mean[i], std[i], minv[i], maxv[i]))
+          mean[i] = 0
+          std[i] = 1
+
+        np.save(savedir + '/' + name + '.npy', {'min': minv, 'max': maxv, 'mean': mean, 'std': std})
+        for i in range(len(lst)):
+         lst[i] = (lst[i] - mean) / std
+
+    f.close()
+    return mean, std
+
   def normalize(self, inps, outps):
-    meani, stdi = normalizeData(inps["training"], "save/" + self.args.save_dir, "statinput", ["fea%02d" % x for x in range(inps["training"][0].shape[1])], normalize=self.args.normalizeinput)
-    meano, stdo = normalizeData(outps["training"], "save/" + self.args.save_dir, "statoutput", ["fea%02d" % x for x in range(outps["training"][0].shape[1])], normalize=self.args.normalizeoutput)
+    meani, stdi = self.normalizeData(inps["training"], "save/" + self.save_dir, "statinput", ["fea%02d" % x for x in
+        range(inps["training"][0].shape[1])], normalize=self.normalizeinput)
+    meano, stdo = self.normalizeData(outps["training"], "save/" + self.save_dir, "statoutput", ["fea%02d" % x for x in range(outps["training"][0].shape[1])], normalize=self.normalizeoutput)
 
     for i in range(len(inps["validation"])):
       inps["validation"][i] = (inps["validation"][i] - meani) / stdi;
@@ -115,15 +150,15 @@ class DataLoader():
   def loadData(self):
     if not os.path.exists("save/"):
       os.mkdir("save/")
-    if not os.path.exists("save/" + self.args.save_dir):
-      os.mkdir("save/" + self.args.save_dir)
+    if not os.path.exists("save/" + self.save_dir):
+      os.mkdir("save/" + self.save_dir)
 
-    if len(self.args.usetrainingof):
-      data_file = "data/training_" + self.args.usetrainingof + ".cpkl"
+    if len(self.usetrainingof):
+      data_file = "data/training_" + self.usetrainingof + ".cpkl"
     else:
-      data_file = "data/training_" + self.args.save_dir + ".cpkl"
+      data_file = "data/training_" + self.save_dir + ".cpkl"
 
-    if not (os.path.exists(data_file)) or self.args.reprocess:
+    if not (os.path.exists(data_file)) or self.reprocess:
       print("creating training data cpkl file from raw source")
       inps, outps = self.preprocess(data_file)
 
@@ -135,7 +170,6 @@ class DataLoader():
       cPickle.dump({"input": inps["training"], "inputmean": meani, "inputstd": stdi, "output": outps["training"], "outputmean":meano, "outputstd": stdo, "vinput": inps["validation"], "voutput": outps["validation"]}, f, protocol=2) 
       f.close() 
 
-
     f = open(data_file,"rb")
     data = cPickle.load(f)
     inps = {"training": data["input"], "validation": data["vinput"]} 
@@ -145,7 +179,7 @@ class DataLoader():
     self.dimin = inps["training"][0].shape[1]
     self.dimout = outps["training"][0].shape[1]
 
-    self.inps, self.outps = self.load_preprocessed(inps, outps)
+    return self.load_preprocessed(inps, outps)
 
 
   def sample(self, sess, args, data, pt):

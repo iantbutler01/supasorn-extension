@@ -20,7 +20,7 @@
     "vocab_size": 111153,
     "input_vocab_size": 111153,
     "output_vocab_size": 111153,
-    "num_steps": 1,
+    "num_steps": 100000,
     "train_dataset_path": "../obama_data/",
     "predict_dataset_path" : "./data_files/test_in.csv",
     "eval_dataset_paths" : ["./data_files/validation_in.csv", "./data_files/validation_out.csv"],

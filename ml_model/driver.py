@@ -16,11 +16,10 @@ with open('./hyperparameters.json', 'r') as f:
 
 def model_fn(features, labels, mode, params, config):
 
-    model = Seq2Shape(params.batch_size, 28, mode)
-    print(features)
+    model = Seq2Shape(params.batch_size, 20, mode)
     if mode == estimator.ModeKeys.TRAIN or mode == estimator.ModeKeys.EVAL:
-        _, sample_id = model.translate(params.num_units, features)
-        spec = model.prepare_train_eval(t_out, params.num_units, labels, params.learning_rate)
+        t_out, sample_id = model.translate(params.num_units, features)
+        spec = model.prepare_train_eval(t_out, params.num_units, 100, labels, params.learning_rate)
     if mode == estimator.ModeKeys.PREDICT:
         _, sample_id = model.translate(params.num_units, features)
         spec = model.prepare_predict(sample_id)

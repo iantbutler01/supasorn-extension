@@ -12,3 +12,7 @@ is/*
 video_prep/frontalized_faces/*
 reagan
 face_frontalization/*
+ml_model/data/*
+ml_model/save/*
+ml_model/__pycache__/*
+*.pyc

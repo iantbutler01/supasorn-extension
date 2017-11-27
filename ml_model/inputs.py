@@ -8,8 +8,8 @@ class ModelInputs():
         self, batch_size, file_path
     ):
         self.batch_size = batch_size
-        loader = DataLoader(file_path)
-        self.data = loader.preprocess('./data_saves')
+        loader = DataLoader(file_path, 'data_saves')
+        self.data = loader.loadData()
 
     def get_inputs(self, mode=tf.estimator.ModeKeys.TRAIN):
         self.mode = mode
@@ -26,6 +26,22 @@ class ModelInputs():
         )
         return batched_set
 
+    def _prepare_iterator_hook(self, hook, scope_name, iterator, inputs, placeholder):
+        if self.mode == tf.estimator.ModeKeys.TRAIN or self.mode == tf.estimator.ModeKeys.EVAL:
+            feed_dict = {
+                    placeholder[0]: inputs[0],
+                    placeholder[1]: inputs[1]
+            }
+        else:
+            feed_dict = {placeholder: file_path}
+
+        with tf.name_scope(scope_name):
+            hook.iterator_initializer_func = \
+                    lambda sess: sess.run(
+                        iterator.initializer,
+                        feed_dict=feed_dict,
+                    )
+
     def _set_up_train_or_eval(self, scope_name):
         hook = IteratorInitializerHook()
         data = self.data
@@ -35,11 +51,20 @@ class ModelInputs():
         else:
             inputs = np.concatenate(data[0]['training'])
             outputs = np.concatenate(data[1]['training'])
+        in_shape = ((inputs.shape[0]//100), 100, 28)
+        out_shape = ((outputs.shape[0]//100), 100, 20)
+        inputs = np.reshape(inputs, in_shape)
+        outputs = np.reshape(outputs, out_shape)
         def input_fn():
             with tf.name_scope(scope_name):
-                dataset = tf.data.Dataset.from_tensor_slices((inputs, outputs)).repeat(None)
+                inp_placeholder = tf.placeholder(tf.float64, shape=in_shape)
+                out_placeholder = tf.placeholder(tf.float64, shape=out_shape)
+                dataset = tf.data.Dataset.from_tensor_slices((inp_placeholder, out_placeholder)).repeat(None)
+                dataset = self._batch_data(dataset)
                 iterator = dataset.make_initializable_iterator()
                 next_example, next_label = iterator.get_next()
+                self._prepare_iterator_hook(hook, 'train_inputs', iterator, (inputs, outputs), (inp_placeholder,
+                    out_placeholder))
                 return next_example, next_label
 
         return (input_fn, hook)
