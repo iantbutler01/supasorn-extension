@@ -15,4 +15,7 @@ face_frontalization/*
 ml_model/data/*
 ml_model/save/*
 ml_model/__pycache__/*
+ml_model/data_wo_time_delay
+ml_model/og_model_saves
+ml_model/__pycache__/*
 *.pyc

@@ -19,7 +19,6 @@ class Seq2Shape():
 
     def _decoder(self, network_cell, inputs, helper=None):
         if not helper:
-            input_lengths = tf.reduce_sum(tf.to_int32(tf.not_equal(inputs, 1)), 1)
             helper = tf.contrib.seq2seq.TrainingHelper(
                 inputs,
                 [100]*self.batch_size
@@ -32,16 +31,32 @@ class Seq2Shape():
         )
         return decoder
 
+    def _attention_cell(self, num_units, memory, memory_sequence_length, network_cell):
+        mechanism = tf.contrib.seq2seq.BahdanauAttention(num_units, memory, memory_sequence_length)
+        return tf.contrib.seq2seq.AttentionWrapper(
+            network_cell,
+            mechanism,
+            attention_layer_size=num_units,
+            alignment_history=False,
+            name='AttentionWrapper'
+        )
+
     def translate(
         self, num_units,
-        inputs, cell=None,
+        inputs, cell=None, num_layers=1
     ):
         with tf.name_scope('Translate'):
             if cell:
                 network_cell = cell
             else:
-                network_cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
-
+                network_cell = tf.contrib.rnn.MultiRNNCell([tf.nn.rnn_cell.BasicLSTMCell(num_units) for x in
+                    range(num_layers)])
+            network_cell = tf.contrib.rnn.DropoutWrapper(
+                network_cell,
+                input_keep_prob=0.7,
+                output_keep_prob=0.6,
+            )
+            network_cell = self._attention_cell(num_units, inputs, [100]*self.batch_size, network_cell)
             decoder = self._decoder(network_cell, inputs)
             outputs = tf.contrib.seq2seq.dynamic_decode(
                 decoder,
@@ -69,13 +84,16 @@ class Seq2Shape():
             labels,
         ))
         loss = loss / (self.batch_size*out_seq_len*self.dim_out)
-
+        # def clip_gradients(tups):
+        #     print(tups)
+        #     return [ (tf.clip_by_global_norm([x[0]], 5.0), x[1]) for x in tups ]
         train_op = tf.contrib.layers.optimize_loss(
             loss,
             tf.train.get_global_step(),
             optimizer='SGD',
             learning_rate=lr,
-            summaries=['loss', 'learning_rate']
+            summaries=['loss', 'learning_rate'],
+            clip_gradients=5.0
         )
 
         return tf.estimator.EstimatorSpec(

@@ -8,7 +8,8 @@ class ModelInputs():
         self, batch_size, file_path
     ):
         self.batch_size = batch_size
-        loader = DataLoader(file_path, 'data_saves')
+        self.time_delay=20
+        loader = DataLoader(file_path, 'data_saves', time_delay=self.time_delay)
         self.data = loader.loadData()
 
     def get_inputs(self, mode=tf.estimator.ModeKeys.TRAIN):
@@ -51,10 +52,12 @@ class ModelInputs():
         else:
             inputs = np.concatenate(data[0]['training'])
             outputs = np.concatenate(data[1]['training'])
-        in_shape = ((inputs.shape[0]//100), 100, 28)
-        out_shape = ((outputs.shape[0]//100), 100, 20)
-        inputs = np.reshape(inputs, in_shape)
-        outputs = np.reshape(outputs, out_shape)
+        in_limit = inputs.shape[0]//100
+        in_shape = (in_limit, 100, 28)
+        out_limit = outputs.shape[0]//100
+        out_shape = (out_limit, 100, 20)
+        inputs = np.reshape(inputs[:in_limit*100], in_shape)
+        outputs = np.reshape(outputs[:out_limit*100], out_shape)
         def input_fn():
             with tf.name_scope(scope_name):
                 inp_placeholder = tf.placeholder(tf.float64, shape=in_shape)
