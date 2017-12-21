@@ -18,11 +18,11 @@ def model_fn(features, labels, mode, params, config):
 
     model = Seq2Shape(params.batch_size, 20, mode)
     if mode == estimator.ModeKeys.TRAIN or mode == estimator.ModeKeys.EVAL:
-        t_out, sample_id = model.translate(params.num_units, features)
+        t_out = model.translate(params.num_units, features)
         spec = model.prepare_train_eval(t_out, params.num_units, 100, labels, params.learning_rate)
     if mode == estimator.ModeKeys.PREDICT:
-        _, sample_id = model.translate(params.num_units, features)
-        spec = model.prepare_predict(sample_id)
+        p_out = model.translate(params.num_units, features)
+        spec = model.prepare_predict(p_out)
     return spec
 
 def experiment_fn(run_config, hparams):
@@ -40,7 +40,7 @@ def experiment_fn(run_config, hparams):
         min_eval_frequency=hparams.min_eval_frequency,
         train_monitors=[train_input_hook],
         eval_hooks=[eval_input_hook],
-        eval_steps=1000
+        eval_steps=20000
     )
 
 def get_estimator(run_config, hparams):
@@ -52,9 +52,7 @@ def get_estimator(run_config, hparams):
 
 def print_predictions(predictions, hparams):
     for pred in predictions:
-        for sent in pred:
-            stred = map(str, sent)
-            print(' '.join(stred))
+        print(pred)
 
 def main():
     hparams = HParams(**HPARAMS)
@@ -68,9 +66,8 @@ def main():
             hparams=hparams,
         )
     elif argv[1] == 'predict':
-        input_fn_factory = ModelInputs(hparams.vocab_paths, hparams.batch_size)
-        predict_input_fn, predict_input_hook = input_fn_factory.get_inputs(hparams.predict_dataset_path,
-                mode=estimator.ModeKeys.PREDICT, num_infer=1)
+        input_fn_factory = ModelInputs(hparams.batch_size, hparams.train_dataset_path)
+        predict_input_fn, predict_input_hook = input_fn_factory.get_inputs( mode=tf.estimator.ModeKeys.PREDICT)
         classifier = get_estimator(run_config, hparams)
         predictions = classifier.predict(input_fn=predict_input_fn, hooks=[predict_input_hook])
         print_predictions(predictions, hparams)

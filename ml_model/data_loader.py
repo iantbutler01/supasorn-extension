@@ -28,7 +28,7 @@ class DataLoader():
 
   def __init__(self, training_dir, save_dir, seq_length=100, time_delay=0):
     self.training_dir = training_dir
-    self.fps = 29
+    self.fps = 29.97
     self.save_dir = save_dir
     self.reprocess = False
     self.usetrainingof = ''
@@ -66,8 +66,7 @@ class DataLoader():
     inps = {"training": [], "validation": []}
     outps = {"training": [], "validation": []}
 
-    # validation = 0.2
-    validation = 0
+    validation = 0.2
     for i in range(len(files)):
       tp = "training" if random.random() > validation else "validation"
 

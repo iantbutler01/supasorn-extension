@@ -1,5 +1,5 @@
 {
-    "num_units": 30,
+    "num_units": 100,
     "peepholes": true,
     "keep_probability": 0.7160809299704125,
     "time_major": false,
@@ -13,9 +13,9 @@
     "keep_probability": 0.7,
     "reuse": true,
     "optimizer": "Momentum",
-    "learning_rate": 0.000015,
+    "learning_rate": 0.001,
     "summaries": ["loss", "learning_rate"],
-    "batch_size": 20,
+    "batch_size": 100,
     "data_names": ["input:0", "output:0"],
     "vocab_size": 111153,
     "input_vocab_size": 111153,

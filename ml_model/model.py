@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow import estimator
 import numpy as np
 import json
+from floating_point_helper import FloatingPointHelper
 
 class Seq2Shape():
 
@@ -17,9 +18,10 @@ class Seq2Shape():
     def _get_lstm(self, num_units):
         return tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
+
     def _decoder(self, network_cell, inputs, helper=None):
         if not helper:
-            helper = tf.contrib.seq2seq.TrainingHelper(
+            helper = FloatingPointHelper(
                 inputs,
                 [100]*self.batch_size
             )
@@ -54,20 +56,22 @@ class Seq2Shape():
             network_cell = tf.contrib.rnn.DropoutWrapper(
                 network_cell,
                 input_keep_prob=0.7,
-                output_keep_prob=0.6,
+                output_keep_prob=0.7,
             )
-            network_cell = self._attention_cell(num_units, inputs, [100]*self.batch_size, network_cell)
-            decoder = self._decoder(network_cell, inputs)
-            outputs = tf.contrib.seq2seq.dynamic_decode(
-                decoder,
-                impute_finished=True,
-                maximum_iterations=100,
+
+            inputs = tf.split(inputs, 100, axis=1)
+            inputs = [tf.squeeze(input_, [1]) for input_ in inputs]
+            outputs,_ = tf.contrib.legacy_seq2seq.rnn_decoder(
+                inputs,
+                network_cell.zero_state(batch_size=self.batch_size, dtype=tf.float64),
+                network_cell,
+                scope='rnndec'
+                
             )
-            outputs = outputs[0]
             if self.mode != estimator.ModeKeys.PREDICT:
-                return outputs.rnn_output, outputs.sample_id
+                return outputs
             else:
-                return outputs.rnn_output, outputs.sample_id
+                return outputs
 
     def prepare_train_eval(
         self, t_out, num_units,
@@ -75,25 +79,22 @@ class Seq2Shape():
     ):
         with tf.variable_scope('Weights_Intersect'):
           output_w = tf.get_variable("output_w", [num_units, self.dim_out], dtype=tf.float64)
-          output_b = tf.get_variable("output_b", [self.dim_out], dtype=tf.float64)
+          output_b = tf.get_variable("output_b", [20], dtype=tf.float64)
         t_out = tf.reshape(tf.concat(t_out, 1), [-1, num_units])
         t_out = tf.nn.xw_plus_b(t_out, output_w, output_b)
         labels = tf.reshape(labels,[-1, self.dim_out])
         loss = tf.reduce_sum(tf.squared_difference(
-            t_out,
             labels,
+            t_out
         ))
         loss = loss / (self.batch_size*out_seq_len*self.dim_out)
-        # def clip_gradients(tups):
-        #     print(tups)
-        #     return [ (tf.clip_by_global_norm([x[0]], 5.0), x[1]) for x in tups ]
         train_op = tf.contrib.layers.optimize_loss(
             loss,
             tf.train.get_global_step(),
-            optimizer='SGD',
+            optimizer='Adam',
             learning_rate=lr,
             summaries=['loss', 'learning_rate'],
-            clip_gradients=5.0
+            clip_gradients=10.0
         )
 
         return tf.estimator.EstimatorSpec(
@@ -104,6 +105,6 @@ class Seq2Shape():
     def prepare_predict(self, sample_id):
         return tf.estimator.EstimatorSpec(
             mode=self.mode,
-            train_op=train_op,
+            predictions=sample_id
         )
 
